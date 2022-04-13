@@ -2,7 +2,7 @@
 # Автор: Dim
 # Версия: 1.0
 
-param([switch]$Befor = $false, # установите данный флаг, если скрипт запускается до начала резервного копирования
+param([switch]$Before = $false, # установите данный флаг, если скрипт запускается до начала резервного копирования
       [switch]$After = $false, # установите данный флаг, если скрипт запускается после резервного копирования      
       [string]$FolderIBpath = "c:\1CIB", # Путь к папке файловой ИБ (можно посмотреть в диалоге запуска, если вы не до конца знаете что это)
       [string]$FolderIBlogin = "", # Логин для входа в папку с ИБ, можно не указывать если у пользователя от имени которого запускается скрипт имеются права доступа
@@ -64,6 +64,10 @@ function SendMessage($Message) {
             } else {
                 Send-MailMessage @a -UseSsl -ErrorAction 'stop'
             }
+            if ($EmailTest) {
+                echo "Тестовое письмо отправлено на $EmailTo"
+            }
+
         } catch {
             Write-Output "Не удалось отправить письмо"
         }    
@@ -73,7 +77,10 @@ function SendMessage($Message) {
     if (($TelegramToken -and $TelegramChatID -and ($Messengers -match 't')) -or $TelegramTest) {
         try {
             $URI = "https://api.telegram.org/bot" + $TelegramToken + "/sendMessage?chat_id=" + $TelegramChatID + "&text=" + $Message
-            Invoke-WebRequest -URI ($URI) -ErrorAction 'stop' | Out-Null        
+            Invoke-WebRequest -URI ($URI) -ErrorAction 'stop' | Out-Null
+            if ($TelegramTest) {
+                echo "Тестовое собщение в телеграм отправлено"
+            }        
         } catch {
             Write-Output "Не удалось отправить сообщение в телеграмм"
         }    
@@ -185,7 +192,17 @@ if (-not (Test-Path $PathIB)) {
 
 $HashFile = GetPathHashFile
 
-if ($Befor) {
+if (-not ($Before -or $After)) {
+    SendMessage "Скрипт запущен без указания параметров -Before или -After"
+    exit
+}
+
+if ($Before -and $After) {
+    SendMessage "Нельзя запускать скрипт указывая одновременно параметры -Before и -After"
+    exit
+}
+
+if ($Before) {
 
     if ($LockIB) {
         CreateLockFile
