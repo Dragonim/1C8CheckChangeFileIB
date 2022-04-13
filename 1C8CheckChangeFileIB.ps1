@@ -103,7 +103,7 @@ function CreateLockFile() {
         }
     }
     catch {
-        SendMessage "Не удалось заблокировать информационную базу в папке $FolderIBpath"   
+        SendMessage "Не удалось создать файл блокировки информационной базы в папке $FolderIBpath"   
     }
 
 }
