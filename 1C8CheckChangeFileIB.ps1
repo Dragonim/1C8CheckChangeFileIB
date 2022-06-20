@@ -1,8 +1,8 @@
 ﻿# Описание: Скрипт позволяет убедиться что файловая ИБ не была изменена во время копирования
 # Автор: Dim
-# Версия: 1.0
+# Версия: 1.01
 
-param([switch]$Before = $false, # установите данный флаг, если скрипт запускается до начала резервного копирования
+param([switch]$Befor = $false, # установите данный флаг, если скрипт запускается до начала резервного копирования
       [switch]$After = $false, # установите данный флаг, если скрипт запускается после резервного копирования      
       [string]$FolderIBpath = "c:\1CIB", # Путь к папке файловой ИБ (можно посмотреть в диалоге запуска, если вы не до конца знаете что это)
       [string]$FolderIBlogin = "", # Логин для входа в папку с ИБ, можно не указывать если у пользователя от имени которого запускается скрипт имеются права доступа
@@ -26,10 +26,10 @@ param([switch]$Before = $false, # установите данный флаг, е
 #################### Объявление и мутация глобальных переменных
 
 # добавляем в конец пути обратный слэш, если такого там нет
-if (-not $FolderIBpath.EndsWith("\")) {$FolderIBpath = $FolderIBpath + "\"}
+if (-not $FolderIBpath.EndsWith('\')) {$FolderIBpath = $FolderIBpath + '\'}
 
-$PathIB = $FolderIBpath + "1Cv8.1CD"
-$PathLockFile = $FolderIBpath + "1Cv8.cdn"
+$PathIB = $FolderIBpath + '1Cv8.1CD'
+$PathLockFile = $FolderIBpath + '1Cv8.cdn'
 
 # Если переданы данные доступа для каталога с файловой ИБ, то надо их использовать
 $FolderIBcredential = ""
@@ -113,14 +113,20 @@ function DeleteLockFile() {
     if (Test-Path $PathLockFile) {
         try {
             if ($FolderIBcredential) {
-                Remove-Item -Path $FolderIBpath -Force -Credential $FolderIBcredential | Out-Null 
+                Remove-Item -Path $PathLockFile -Force -Credential $FolderIBcredential | Out-Null 
             } else {
-                Remove-Item -Path $FolderIBpath -Force | Out-Null 
+                Remove-Item -Path $PathLockFile -Force | Out-Null 
             }
         }
         catch {
-            Write-Output "Не удалось удалить файл блокировки файловой ИБ $FolderIBpath"
+            Write-Output "Не удалось удалить файл блокировки файловой ИБ $PathLockFile"
         }
+    }
+}
+
+function DeleteHashFile() {
+    if (Test-Path $HashFile) {
+		Remove-Item -Path $HashFile -Force | Out-Null 
     }
 }
 
@@ -210,19 +216,32 @@ if ($Before) {
     }    
     
     $hash = GetHash($PathIB)
-    New-Item -Path $HashFile -Value $hash -Force | Out-Null 
+    try {
+		New-Item -Path $HashFile -Value $hash -Force | Out-Null 
+    }
+    catch {
+        SendMessage "Не удалось создать файл с хэш-суммой $HashFile"  
+		exit
+    }
 
 }
 
 if ($After) {
     
     $NewHash = GetHash($PathIB)
-    $OldHash = Get-Content -Path $HashFile
+    try {
+		$OldHash = Get-Content -Path $HashFile
+    }
+    catch {
+        SendMessage "Не удалось прочитать файл с хэш-суммой $HashFile"		
+    }
     
     if ($OldHash -ne $NewHash) {
         SendMessage "Файловая информационная база $PathIB была изменена. Если производилось резервное копирование, то велика вероятность нарушения целостности резервной копии ИБ"
     }
 
+	DeleteHashFile
+	
     if ($LockIB) {
         DeleteLockFile
     }    
