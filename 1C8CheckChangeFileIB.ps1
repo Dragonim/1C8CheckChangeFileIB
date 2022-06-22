@@ -1,6 +1,6 @@
 ﻿# Описание: Скрипт позволяет убедиться что файловая ИБ не была изменена во время копирования
 # Автор: Dim
-# Версия: 1.02
+# Версия: 1.03
 
 param([switch]$Before = $false, # установите данный флаг, если скрипт запускается до начала резервного копирования
       [switch]$After = $false, # установите данный флаг, если скрипт запускается после резервного копирования      
@@ -230,6 +230,8 @@ if ($Before -and $After) {
     exit 4
 }
 
+# коды выхода из скрипта для программы duplicati
+# https://github.com/duplicati/duplicati/blob/master/Duplicati/Library/Modules/Builtin/run-script-example.bat
 $ExitCode = 0
 
 if ($Before) {
