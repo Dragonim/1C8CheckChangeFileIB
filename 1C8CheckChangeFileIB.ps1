@@ -17,7 +17,7 @@ param([switch]$Before = $false, # установите данный флаг, е
       [string]$TelegramToken = "", # Токен телеграмм бота
       [string]$TelegramChatID = "", # ИД пользователя которому будет отправлено сообщение от имени телеграмм бота
       [switch]$TelegramTest = $false, # проверка настроек телеграмм бота
-      [string]$Messengers = "mt", # m - email, t - telegram, e -- вывод сообщений в консоль
+      [string]$Messengers = "mt", # m - email, t - telegram, e -- вывод сообщений об ошибках в консоль
       [switch]$LockIB = $false, # установите данный флаг, если необходимо заблокировать ИБ от изменений
       [int]$LockTime = 300, # время в секундах на которое будет заблокирована база, если ноль, то блокировка перманентная
       [int]$HashsumTimeout = 60, # время в секундах между созданием файла блокировки и получением хеш-суммы файла. За это время платформа должна успеть выбросить всех пользователей из ИБ
@@ -88,9 +88,21 @@ function SendMessage($Message) {
 
     # сообщение в консоль
     if ($Messengers -match 'e') {
-        Write-Output $Message            
+        Write-Error $Message          
     }
     
+}
+
+function TestPathCredential($Path) {
+    $flag = $false
+
+    if ($FolderIBcredential) {
+        $flag = Test-Path -Path $Path -Credential $FolderIBcredential
+    } else {
+        $flag = Test-Path -Path $Path 
+    }
+
+    return $flag
 }
 
 function CreateLockFile() {
@@ -107,16 +119,20 @@ function CreateLockFile() {
         } else {
             New-Item -Path $PathLockFile  -Value $text -Force | Out-Null 
         }
+
+        return $true
+
     }
     catch {
         SendMessage "Не удалось создать файл блокировки информационной базы в папке $FolderIBpath"   
+        return $false
     }
 
 }
 
 function DeleteLockFile() {
 
-    if (Test-Path $PathLockFile) {
+    if (TestPathCredential $PathLockFile) {
         try {
             if ($FolderIBcredential) {
                 Remove-Item -Path $PathLockFile -Force -Credential $FolderIBcredential | Out-Null 
@@ -188,37 +204,42 @@ function GetHash($File) {
 
 if ($EmailTest) {
     SendMessage "Проверка связи"
-    exit
+    exit 0
 }
 
 if ($TelegramTest) {
     SendMessage "Проверка связи"
-    exit
+    exit 0
 }
 
-# проверим, имеется ли в каталоге ИБ
-if (-not (Test-Path $PathIB)) {
+# проверим, имеется ли файл ИБ
+if (-not (TestPathCredential $PathIB)) {    
     SendMessage "Не найден файл 1Cv8.1CD в папке $FolderIBpath"
-    exit
+    exit 4
 }
 
 $HashFile = GetPathHashFile
 
 if (-not ($Before -or $After)) {
     SendMessage "Скрипт запущен без указания параметров -Before или -After"
-    exit
+    exit 4
 }
 
 if ($Before -and $After) {
     SendMessage "Нельзя запускать скрипт указывая одновременно параметры -Before и -After"
-    exit
+    exit 4
 }
+
+$ExitCode = 0
 
 if ($Before) {
 
     if ($LockIB) {
-        CreateLockFile
-        Start-Sleep -Seconds $HashsumTimeout
+        if (CreateLockFile) {
+            Start-Sleep -Seconds $HashsumTimeout
+        } else {
+            $ExitCode = 4    
+        }
     }    
     
     $hash = GetHash($PathIB)
@@ -227,23 +248,25 @@ if ($Before) {
     }
     catch {
         SendMessage "Не удалось создать файл с хэш-суммой $HashFile"  
-		exit
+		$ExitCode = 4
     }
 
 }
 
-if ($After) {
+if ($After) {    
     
     $NewHash = GetHash($PathIB)
     try {
 		$OldHash = Get-Content -Path $HashFile
     }
     catch {
-        SendMessage "Не удалось прочитать файл с хэш-суммой $HashFile"		
+        SendMessage "Не удалось прочитать файл с хэш-суммой $HashFile"
+        $ExitCode = 4		
     }
     
     if ($OldHash -ne $NewHash) {
         SendMessage "Файловая информационная база $PathIB была изменена. Если производилось резервное копирование, то велика вероятность нарушения целостности резервной копии ИБ"
+        $ExitCode = 4
     }
 
 	DeleteHashFile
@@ -254,6 +277,8 @@ if ($After) {
 
     if ($HealthСheck) {
         Invoke-RestMethod $HealthСheck
-    } 
+    }    
 
 }
+
+exit $ExitCode
