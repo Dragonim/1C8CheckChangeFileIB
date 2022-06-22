@@ -1,6 +1,6 @@
 ﻿# Описание: Скрипт позволяет убедиться что файловая ИБ не была изменена во время копирования
 # Автор: Dim
-# Версия: 1.01
+# Версия: 1.02
 
 param([switch]$Before = $false, # установите данный флаг, если скрипт запускается до начала резервного копирования
       [switch]$After = $false, # установите данный флаг, если скрипт запускается после резервного копирования      
@@ -17,7 +17,7 @@ param([switch]$Before = $false, # установите данный флаг, е
       [string]$TelegramToken = "", # Токен телеграмм бота
       [string]$TelegramChatID = "", # ИД пользователя которому будет отправлено сообщение от имени телеграмм бота
       [switch]$TelegramTest = $false, # проверка настроек телеграмм бота
-      [string]$Messengers = "mt", # m - email, t - telegram
+      [string]$Messengers = "mt", # m - email, t - telegram, e -- вывод сообщений в консоль
       [switch]$LockIB = $false, # установите данный флаг, если необходимо заблокировать ИБ от изменений
       [int]$LockTime = 300, # время в секундах на которое будет заблокирована база, если ноль, то блокировка перманентная
       [int]$HashsumTimeout = 60, # время в секундах между созданием файла блокировки и получением хеш-суммы файла. За это время платформа должна успеть выбросить всех пользователей из ИБ
@@ -65,7 +65,7 @@ function SendMessage($Message) {
                 Send-MailMessage @a -UseSsl -ErrorAction 'stop'
             }
             if ($EmailTest) {
-                echo "Тестовое письмо отправлено на $EmailTo"
+                Write-Output "Тестовое письмо отправлено на $EmailTo"
             }
 
         } catch {
@@ -79,12 +79,18 @@ function SendMessage($Message) {
             $URI = "https://api.telegram.org/bot" + $TelegramToken + "/sendMessage?chat_id=" + $TelegramChatID + "&text=" + $Message
             Invoke-WebRequest -URI ($URI) -ErrorAction 'stop' | Out-Null
             if ($TelegramTest) {
-                echo "Тестовое собщение в телеграм отправлено"
+                Write-Output "Тестовое собщение в телеграм отправлено"
             }        
         } catch {
             Write-Output "Не удалось отправить сообщение в телеграмм"
         }    
     }
+
+    # сообщение в консоль
+    if ($Messengers -match 'e') {
+        Write-Output $Message            
+    }
+    
 }
 
 function CreateLockFile() {
@@ -119,7 +125,7 @@ function DeleteLockFile() {
             }
         }
         catch {
-            Write-Output "Не удалось удалить файл блокировки файловой ИБ $PathLockFile"
+            SendMessage "Не удалось удалить файл блокировки информационной базы $PathLockFile"
         }
     }
 }
